@@ -1,81 +1,156 @@
-import { tasks, getNextId } from "../data/tasks.js";
+import Task from "../models/task.js";
+import mongoose from "mongoose";
 
-export const getTasks = (req, res) => {
+// GET all tasks
+export const getTasks = async (req, res) => {
+  const tasks = await Task.find();
   res.json(tasks);
 };
 
-export const getTaskById = (req, res) => {
-  const taskId = req.params.id;
+// GET task by ID
+export const getTaskById = async (req, res) => {
+  // Validate ID
+  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+    const error = new Error("Invalid task ID");
+    error.statusCode = 400;
+    throw error;
+  }
 
-  const task = tasks.find((task) => task.id === Number(taskId));
+  const task = await Task.findById(req.params.id);
 
   if (!task) {
     const error = new Error("Task not found");
     error.statusCode = 404;
-
     throw error;
   }
 
   res.json(task);
 };
 
-export const createTask = (req, res) => {
-  if (!req.body.title) {
+// CREATE a new task
+export const createTask = async (req, res) => {
+  // Validate title
+  if (typeof req.body.title !== "string" || req.body.title.trim() === "") {
     const error = new Error("Title is required");
     error.statusCode = 400;
-
     throw error;
   }
 
-  const task = {
-    id: getNextId(),
-    ...req.body,
-  };
-
-  tasks.push(task);
+  const task = await Task.create({
+    title: req.body.title.trim(),
+    completed: req.body.completed,
+  });
 
   res.status(201).json(task);
 };
 
-export const updateTask = (req, res) => {
-  const taskId = req.params.id;
+// UPDATE a task
+export const updateTask = async (req, res) => {
+  // Validate ID
+  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+    const error = new Error("Invalid task ID");
+    error.statusCode = 400;
+    throw error;
+  }
 
-  const task = tasks.find((task) => task.id === number(taskId));
+  // Validate title
+  if (typeof req.body.title !== "string" || req.body.title.trim() === "") {
+    const error = new Error("Title is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const task = await Task.findByIdAndUpdate(
+    req.params.id,
+    {
+      title: req.body.title.trim(),
+      completed: req.body.completed,
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
 
   if (!task) {
     const error = new Error("Task not found");
     error.statusCode = 404;
-
     throw error;
   }
-
-  if (!req.body.title) {
-    const error = new Error("Title is required");
-    error.statusCode = 400;
-
-    throw error;
-  }
-
-  task.title = req.body.title;
 
   res.json(task);
 };
 
-export const deleteTask = (req, res) => {
-  const taskId = req.params.id;
-
-  const taskIndex = tasks.findIndex((task) => task.id === Number(taskId));
-
-  if (taskIndex === -1) {
-    const error = new Error("Task not found");
-    error.statusCode = 404;
-
+// DELETE a task
+export const deleteTask = async (req, res) => {
+  // Validate ID
+  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+    const error = new Error("Invalid task ID");
+    error.statusCode = 400;
     throw error;
   }
 
-  tasks.slice(taskIndex, -1);
+  const task = await Task.findByIdAndDelete(req.params.id);
+
+  if (!task) {
+    const error = new Error("Task not found");
+    error.statusCode = 404;
+    throw error;
+  }
 
   res.json({
     message: "Task deleted successfully",
   });
+};
+
+// PATCH a task (partial update)
+export const patchTask = async (req, res) => {
+  // Validate ID
+  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+    const error = new Error("Invalid task ID");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const updates = {};
+
+  if (req.body.title !== undefined) {
+    if (typeof req.body.title !== "string" || req.body.title.trim() === "") {
+      const error = new Error("Title is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    updates.title = req.body.title.trim();
+  }
+
+  if (req.body.completed !== undefined) {
+    if (typeof req.body.completed !== "boolean") {
+      const error = new Error("Completed must be a boolean");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    updates.completed = req.body.completed;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    const error = new Error("At least one field is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const task = await Task.findByIdAndUpdate(
+    req.params.id,
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+
+  if (!task) {
+    const error = new Error("Task not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  res.json(task);
 };

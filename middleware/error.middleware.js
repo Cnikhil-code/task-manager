@@ -1,7 +1,13 @@
 export const errorHandler = (err, req, res, next) => {
   console.error(err);
 
-  res.status(err.statusCode || 500).json({
-    message: err.message || "Something want worng",
+  const statusCode = err.statusCode || 500;
+
+  res.status(statusCode).json({
+    success: false,
+    message:
+      statusCode === 500
+        ? "Internal Server Error"
+        : err.message || "Something went wrong",
   });
 };
